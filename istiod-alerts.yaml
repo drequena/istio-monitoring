@@ -1,0 +1,244 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  labels:
+    app: istiod
+    ifood_squad: sre
+    ifood_tribe: infra
+  name: istiod
+spec:
+  groups:
+  - name: istiod-cidadel
+    rules:
+    - alert: IstioCitadelRootCertError
+      annotations:
+        summary: "Citadel root certificate internal error occured"
+        description: "Citadel root certificate internal error occured on {{ $labels.instance }} instance"
+      labels:
+        app: istiod-cidadel
+        severity: critical
+      expr: |
+        citadel_server_root_cert_expiry_timestamp <0
+    - alert: IstioCitadelAuthenticationFailure
+      annotations:
+        summary: "Citadel server authentication failed"
+        description: "Citadel server authentication failed in last 5 minutes on {{ $labels.instance }} instance"
+      labels:
+        app: istiod-cidadel
+        severity: critical
+      expr: |
+        (absent(citadel_server_authentication_failure_count offset 5m) == 1 and citadel_server_authentication_failure_count > 0) or (citadel_server_authentication_failure_count - citadel_server_authentication_failure_count offset 5m > 0)
+    - alert: IstioCitadelCsrParsingError
+      annotations:
+        summary: "Citadel CSR parsing error"
+        description: "Citadel CSR parsing error occured in last 5 minutes on {{ $labels.instance }} instance"
+      labels:
+        app: istiod-cidadel
+        severity: critical
+      expr: |
+        (absent(citadel_server_csr_parsing_err_count offset 5m) == 1 and citadel_server_csr_parsing_err_count > 0) or (citadel_server_csr_parsing_err_count - citadel_server_csr_parsing_err_count offset 5m > 0)
+    - alert: IstioCitadelCsrSignError
+      annotations:
+        summary: "Citadel CSR signing error"
+        description: "Citadel CSR signing error occured in last 5 minutes on {{ $labels.instance }} instance"
+      labels:
+        app: istiod-cidadel
+        severity: critical
+      expr: |
+        (absent(citadel_server_csr_sign_err_count offset 5m) == 1 and citadel_server_csr_sign_err_count > 0) or (citadel_server_csr_sign_err_count - citadel_server_csr_sign_err_count offset 5m > 0)
+    - alert: IstioCitadelCertIssuanceFailure
+      annotations:
+        summary: "Citadel certificate issuance failed"
+        description: "Citadel certificate issuance failed in last 5 minutes"
+      labels:
+        app: istiod-cidadel
+        severity: critical
+      expr: |
+        (citadel_server_csr_count - citadel_server_success_cert_issuance_count) > (citadel_server_csr_count offset 5m - citadel_server_success_cert_issuance_count offset 5m)
+  - name: istiod-galley
+    rules:
+    - alert: IstioGalleyConfigUpdateError
+      annotations:
+          summary: "Galley configuration upadate error occured"
+          description: "Galley configuration upadate error occured in last 5 minutes."
+      labels:
+        app: istiod-cidagalleydel
+        severity: critical
+      expr: |
+        (absent(galley_validation_config_update_error offset 5m) == 1 and galley_validation_config_update_error > 0) or (galley_validation_config_update_error - galley_validation_config_update_error offset 5m > 0)    
+    - alert: IstioGalleyConfigLoadError
+      annotations:
+          summary: "Galley configuration loading error occured"
+          description: "Galley configuration loading error occured in last 5 minutes."
+      labels:
+        app: istiod-galley
+        severity: critical
+      expr: |
+        (absent(galley_validation_config_load_error offset 5m) == 1 and galley_validation_config_load_error > 0) or (galley_validation_config_load_error - galley_validation_config_load_error offset 5m > 0)      
+    - alert: IstioGalleyCertKeyUpdateError
+      annotations:
+          summary: "Galley certificate key upadate error occured"
+          description: "Galley certificate key update error occured in last 5 minutes"
+      labels:
+        app: istiod-galley
+        severity: critical
+      expr: |
+        (absent(galley_validation_cert_key_update_errors offset 5m) == 1 and galley_validation_cert_key_update_errors > 0) or (galley_validation_cert_key_update_errors - galley_validation_cert_key_update_errors offset 5m > 0)
+    - alert: IstioGalleyValidationFailed
+      annotations:
+          summary: "Galley validation failed"
+          description: "Galley validation failed in last 5 minutes"
+      labels:
+        app: istiod-galley
+        severity: critical
+      expr: |
+        (absent(galley_validation_failed offset 5m) == 1 and galley_validation_failed > 0) or (galley_validation_failed - galley_validation_failed offset 5m > 0)
+  - name: istiod-pilot
+    rules:
+    - alert: IstioPilotPodNotInEndpointTable
+      annotations:
+        summary: "Pilot pods not found in the endpoint table"
+        description: "Pods not found in the endpoint table, possibly invalid"
+      labels:
+        app: istiod-pilot
+        severity: critical
+      expr: |
+        pilot_no_ip > 0
+    - alert: IstioPilotEndpointNotReady
+      annotations: 
+        summary: "Pilot endpoint found in unready state"
+        description: "Pilot endpoint found in unready state for 3 minutes"
+      labels:
+        app: istiod-pilot
+        severity: critical
+      expr: |
+        pilot_endpoint_not_ready > 0
+      for: 3m    
+    - alert: IstioPilotNoCorrespondingPodsForEndpoint
+      annotations:
+        summary: "Not corresponding pods for endpoint"
+        description: "Some of pilot endpoints do not currently have any corresponding pods"
+      labels:
+        app: istiod-pilot
+        severity: critical        
+      expr: |
+        pilot_k8s_endpoints_pending_pod > 0    
+    - alert: IstioPilotXDSInternalError
+      annotations:
+        summary: "Pilot XDS internal error"
+        descripription: "Pilot XDS internal error occured in last 5m"
+      labels:
+        app: istiod-pilot
+        severity: critical        
+      expr: |
+        pilot_total_xds_internal_errors - pilot_total_xds_internal_errors offset 5m > 0
+      for: 1m
+    - alert: IstioPilotCRDConvertError
+      annotations:
+        summary: "Pilot k8s CRD convertion errorr"
+        description: "Pilot k8s CRD convertion error occured in last 5 minutes"
+      labels:
+        app: istiod-pilot
+        severity: critical        
+      expr: |
+        pilot_total_k8s_object_errors - pilot_total_k8s_object_errors offset 5m > 0
+      for: 3m
+    - alert: IstioPilotNoXDSInstances
+      annotations: 
+        summary: "No XDS instances for cluster"
+        description: "Error occured.  {{ $labels.cluster }} cluster has no XDS instances."
+      labels:
+        app: istiod-pilot
+        severity: critical        
+      for: 3m
+      expr: |
+        pilot_xds_eds_instances == 0
+    - alert: IstioPilotNoXDSEndpoints
+      annotations:
+        summary: "No network XDS endpoints for cluster"
+        description: "Error occured. {{ $labels.cluster }} cluster has no XDS endpoints."
+      labels:
+        app: istiod-pilot
+        severity: critical        
+      expr: |
+        pilot_xds_eds_all_locality_endpoints == 0      
+    - alert: IstioPilotInvalidOutboundListener
+      annotations:
+        summary: "Invalid outbound listener"
+        descripton: " Pilot {{ $labels.instance }} instance  has some invalid outbound listeners"
+      labels:
+        app: istiod-pilot
+        severity: critical        
+      expr: |
+        pilot_invalid_out_listeners > 0
+    - alert: IstioSidecarInjectionFailure
+      annotations:
+        summary: "Istio sidecar injection failure"
+        description: "Istio sidecar injection failed in last 5 minutes"
+      labels:
+        app: istiod-pilot
+        severity: critical        
+      expr: |
+        idecar_injection_requests_total - sidecar_injection_success_total > sidecar_injection_requests_total offset 5m - sidecar_injection_success_total offset 5m
+    - alert: IstioDuplicatedClusters
+      annotations:
+        summary: "Istio clusters duplicated"
+        description: "There are clusters duplicated in Istio in the last 5 minutes. Check serviceentry for duplicated hostnames"
+      labels:
+        app: istiod-pilot
+        severity: warning
+      for: 5m
+      expr: |
+        pilot_duplicate_envoy_clusters > 0
+    - alert: IstioClustersWithNoInstances
+      annotations:
+        summary: "Istio clusters have no instances"
+        description: "There are clusters with  no instances responding to it for last 5 minutes."
+      labels:
+        app: istiod-pilot
+        severity: high
+      for: 5m
+      expr: |
+        pilot_eds_no_instances > 0
+    - alert: IstioListenerConflicts
+      annotations:
+        summary: "Istio Listeners have conflicts"
+        description: "There are Listeners in conflict for last 5 minutes."
+      labels:
+        app: istiod-pilot
+        severity: high
+      for: 5m
+      expr: |
+        pilot_conflict_inbound_listener > 0
+    - alert: IstioPushProxyConfig
+      annotations:
+        summary: "Istio Time to Push Proxy Config"
+        description: "The convergence time of Envoy Proxy config is taking more than 6s for the past 5 minutes"
+      labels:
+        app: istiod-pilot
+        severity: warning
+      for: 5m
+      expr: |
+        histogram_quantile(0.99, sum(rate(pilot_proxy_convergence_time_bucket[1m])) by (le)) > 6
+    - alert: IstioPushProxyConfig
+      annotations:
+        summary: "Istio Time to Push Proxy Config"
+        description: "The convergence time of Envoy Proxy config is taking more than 12s for the past 5 minutes"
+      labels:
+        app: istiod-pilot
+        severity: High
+      for: 5m
+      expr: |
+        histogram_quantile(0.99, sum(rate(pilot_proxy_convergence_time_bucket[1m])) by (le)) > 12
+    - alert: IstioPushProxyConfig
+      annotations:
+        summary: "Istio Time to Push Proxy Config"
+        description: "The convergence time of Envoy Proxy config is taking more than 20s for the past 5 minutes"
+      labels:
+        app: istiod-pilot
+        severity: High
+        ifood_squad: sre
+        ifood_tribe: critical
+      for: 5m
+      expr: |
+        histogram_quantile(0.99, sum(rate(pilot_proxy_convergence_time_bucket[1m])) by (le)) > 20
