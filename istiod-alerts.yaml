@@ -242,3 +242,4 @@ spec:
       for: 5m
       expr: |
         histogram_quantile(0.99, sum(rate(pilot_proxy_convergence_time_bucket[1m])) by (le)) > 20
+
