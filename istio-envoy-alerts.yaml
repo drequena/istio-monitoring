@@ -1,0 +1,57 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  labels:
+    app: envoy
+  name: istio-envoy
+spec:
+  groups:
+  - name: istio-envoy
+    rules:
+    - alert: IstioHighRequestDuration
+      annotations:
+        summary: "Istio request duration is too high"
+        description: "Istio request duration between {{ $labels.source_app }} and {{ $labels.destination_app }} is higher than usual in last 5 minutes"
+      labels:
+        app: envoy
+        severity: critical
+      expr: |
+        sum by (destination_app, source_app, instance) ( istio_request_duration_milliseconds_sum - istio_request_duration_milliseconds_sum offset 5m )/ sum by (destination_app, source_app, instance) ( istio_request_duration_milliseconds_count - istio_request_duration_milliseconds_count offset 5m)  > 2 * sum by (destination_app, source_app, instance) (istio_request_duration_milliseconds_sum offset 5m)/sum by (destination_app, source_app, instance) (istio_request_duration_milliseconds_count offset 5m)
+      for: 5m
+    - alert: IstioLowRequestDuration
+      annotations:  
+        summary: "Istio request duration is too low"
+        description: "Istio request duration between {{ $labels.source_app }} and {{ $labels.destination_app }} is lower than usual for last 5 minutes"
+      labels:
+        app: envoy
+        severity: critical
+      expr: |
+        sum by (destination_app, source_app, instance) ( istio_request_duration_milliseconds_sum - istio_request_duration_milliseconds_sum offset 5m )/ sum by (destination_app, source_app, instance) ( istio_request_duration_milliseconds_count - istio_request_duration_milliseconds_count offset 5m)  <  0.3 * sum by (destination_app, source_app, instance) (istio_request_duration_milliseconds_sum offset 5m)/sum by (destination_app, source_app, instance) (istio_request_duration_milliseconds_count offset 5m)
+      for: 5m 
+    - alert: IstioAbnormalResponseSize
+      annotations:
+        summary:  "Istio response size is too low"
+        descrition:  "Istio responses size between {{ $labels.source_app }} and {{ $labels.destination_app }} is lower than usual for last 5 minutes"
+      labels:
+        app: envoy
+        severity: critical
+      expr: |
+        sum by (destination_app, source_app, instance) (istio_response_bytes_sum offset 5m)/ sum by (destination_app, source_app, instance) (istio_response_bytes_count offset 5m) > 1.5 * sum by (destination_app, source_app, instance)(istio_response_bytes_sum - istio_response_bytes_sum offset 5m)/sum by (destination_app, source_app, instance)(istio_response_bytes_count - istio_response_bytes_count offset 5m)
+    - alert: IstioRequestTotalHTTP5xxRateHigh
+      annotations:
+        summary: 'Istio Percentage of HTTP 5xx responses is too high'
+        description: "The amount of 5xx responses between {{ $labels.source_app }} and {{ $labels.destination_app }}  is higher than 5 percentage. It is too high."
+      labels:
+        app: envoy
+        severity: critical
+      expr: |
+        sum by (destination_app, source_app, instance) (rate(istio_requests_total{response_code=~"5.*"}[5m]))/sum by (destination_app, source_app, instance) (rate(istio_requests_total[5m])) > 0.05
+    - alert: IstioRequestTotalHTTP200RateLow
+      annotations:
+        summary: 'Istio Percentage of HTTP 2xx responses is too low'
+        description: "The amount of 2xx responses between {{ $labels.source_app }} and {{ $labels.destination_app }}  is lower than 95 percentage. It is too low."
+      labels:
+        app: envoy
+        severity: critical
+      expr: |
+        sum by (destination_app, source_app, instance) (rate(istio_requests_total{response_code=~"2.*"}[5m]))/sum by (destination_app, source_app, instance) (rate(istio_requests_total[5m])) < 0.95
